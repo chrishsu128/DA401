@@ -1,0 +1,594 @@
+---
+title: "HSU_PLL"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ggfortify)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(caret)
+library(NeuralNetTools)
+library(deepnet)
+library(ROSE)
+library(DMwR)
+
+```
+
+
+```{r}
+setwd("~/Desktop/DA 401")
+pll=read.csv("pll3.csv")
+
+str(pll)
+pll <- na.omit(pll)
+
+```
+```{r}
+#Correlation table
+res = cor(pll[2:18])
+round(res, 2)
+```
+
+
+```{r}
+#graph of PLL goals vs wins
+pll=pll%>%
+  mutate(avgGoals=G/10)
+
+pll%>%
+  ggplot(aes(x=avgGoals, y=W))+
+  geom_point()+
+  geom_smooth(method='lm')+
+  labs(title="PLL Goals vs Wins",x="Average Goals", y="Wins")
+  
+
+```
+
+
+
+```{r}
+#created PCA table of PLL variables
+pllpca=pll[,c(2:19)]
+
+pca=prcomp(pllpca,scale.=TRUE) #Perform the PCA, scaling variables
+show(pca)
+```
+
+```{r}
+#plotted correlation on heat map
+autoplot(cor(pllpca))
+```
+
+
+```{r}
+#cleaning game data
+game=read.csv("PLLgamestats1.csv")
+game=game[,(1:23)]
+game$Win=as.factor(game$Win)
+game$Win=factor(game$Win, levels = c(0,1), labels=c('TEAM2','TEAM1'))
+#str(game)
+```
+
+
+```{r}
+#cleanin matchup data
+matchup=read.csv("matchup.csv")
+matchup$Win=as.factor(matchup$Win)
+matchup$Win=factor(matchup$Win, levels = c(0,1), labels=c('TEAM2','TEAM1'))
+#str(matchup)
+
+results=matchup[,c(1:4)]
+```
+
+
+
+
+
+```{r}
+#settin parameters for model
+trCtrl=trainControl(method = 'repeatedcv', number = 10, repeats=3)
+tunegrid=expand.grid(layer1=3, layer2= 2,layer3 = 0, hidden_dropout = 0,
+                     visible_dropout = 0)
+```
+
+
+```{r}
+#train and test NN model
+Week1Summaries= matchup[(1:3),]
+
+
+
+
+NNModelweek2pred= train(Win~.,
+                Week1Summaries[,(4:40)],
+                method = "dnn",
+                tuneGrid = tunegrid,
+                trControl= trCtrl,
+                preProcess=c("scale","center"))
+
+predict(NNModelweek2pred,Week1Summaries[,(5:40)])
+
+
+pred=as.data.frame(predict)
+actual=matchup$Win[(4:6)]
+actual
+
+```
+
+
+
+
+```{r}
+#train and test week1 rf model
+trctrl = trainControl(method = "oob")
+random_forest_modelweek2pred = train(Win ~ ., 
+                            data = Week1Summaries[,(4:40)], 
+                            method = "rf",
+                            trControl = trctrl,
+                            ntree = 50,
+                            importance = TRUE)
+
+predict(random_forest_modelweek2pred,Week1Summaries[,(5:40)])
+actual
+```
+
+```{r}
+#creating list of predicted outcome
+rfpred=list("TEAM2","TEAM2","TEAM1")
+```
+
+```{r}
+#find averages for teams, week3 test prediction model
+test= game[(1:12),]
+
+test = test[,c(1,5:23)]%>%
+  group_by(Team) %>%
+    summarise(TeamW = max(TeamW),
+              Points = mean(Points), PA = mean(PA), 
+              X2PtSh = mean(X2PtSh), X2PtShPct = mean(X2PtShPct), 
+              Sh = mean(Sh), Sh.. = mean(Sh..),
+              GB = mean(GB), TO = mean(TO), 
+              CT = mean(CT), FO.. = mean(FO..),PP = mean(PP),
+              PP.. = mean(PP..),Assists = mean(Assists),Saves = mean(Saves),
+              GA = mean(GA),X2GA = mean(X2GA),SvPct = mean(SvPct)
+              )
+
+
+
+Week3test=read.csv("Week3test.csv")
+Week2Summaries=matchup[(1:6),]
+
+```
+
+
+
+```{r}
+#train test week3 NN model
+NNModelweek2pred= train(Win~.,
+                Week2Summaries[,(4:40)],
+                method = "dnn",
+                tuneGrid = tunegrid,
+                trControl= trCtrl,
+                preProcess=c("scale","center"))
+
+pred=predict(NNModelweek2pred,Week3test[,(2:40)])
+pred
+actual=matchup$Win[(7:9)]
+actual
+```
+
+```{r}
+#train test week3 RF model
+random_forest_modelweek2pred = train(Win ~ ., 
+                            data = Week2Summaries[,(4:40)], 
+                            method = "rf",
+                            trControl = trctrl,
+                            ntree = 50,
+                            importance = TRUE)
+
+pred=predict(random_forest_modelweek2pred,Week3test[,(2:40)])
+pred
+actual=matchup$Win[(7:9)]
+actual
+```
+
+```{r}
+#append output to prediction list
+new=c("TEAM2","TEAM2","TEAM2")
+rfpred=c(rfpred,new)
+```
+
+
+Week 4
+
+```{r}
+#create week 4 summaries
+test= game[(1:18),]
+
+test = test[,c(1,5:23)]%>%
+  group_by(Team) %>%
+    summarise(TeamW = max(TeamW),
+              Points = mean(Points), PA = mean(PA), 
+              X2PtSh = mean(X2PtSh), X2PtShPct = mean(X2PtShPct), 
+              Sh = mean(Sh), Sh.. = mean(Sh..),
+              GB = mean(GB), TO = mean(TO), 
+              CT = mean(CT), FO.. = mean(FO..),PP = mean(PP),
+              PP.. = mean(PP..),Assists = mean(Assists),Saves = mean(Saves),
+              GA = mean(GA),X2GA = mean(X2GA),SvPct = mean(SvPct)
+              )
+
+
+Week4test=read.csv("Week4test.csv")
+Week3Summaries=matchup[(1:9),]
+
+
+```
+
+```{r}
+#train test week4 NN model
+NNModelweek4pred= train(Win~.,
+                Week3Summaries[,(4:40)],
+                method = "dnn",
+                tuneGrid = tunegrid,
+                trControl= trCtrl,
+                preProcess=c("scale","center"))
+
+pred=predict(NNModelweek4pred,Week4test[,(2:40)])
+pred
+actual=matchup$Win[(10:12)]
+actual
+```
+
+```{r}
+#train test week 4 RF model
+random_forest_modelweek4pred = train(Win ~ ., 
+                            data = Week3Summaries[,(4:40)], 
+                            method = "rf",
+                            trControl = trctrl,
+                            ntree = 50,
+                            importance = TRUE)
+
+pred=predict(random_forest_modelweek4pred,Week4test[,(2:40)])
+pred
+actual=matchup$Win[(10:12)]
+actual
+```
+
+```{r}
+#append pred outcomes to list
+new=c("TEAM2","TEAM2","TEAM2")
+rfpred=c(rfpred,new)
+```
+
+Week 5
+
+```{r}
+#create week 5 summaries
+test= game[(1:24),]
+
+test = test[,c(1,5:23)]%>%
+  group_by(Team) %>%
+    summarise(TeamW = max(TeamW),
+              Points = mean(Points), PA = mean(PA), 
+              X2PtSh = mean(X2PtSh), X2PtShPct = mean(X2PtShPct), 
+              Sh = mean(Sh), Sh.. = mean(Sh..),
+              GB = mean(GB), TO = mean(TO), 
+              CT = mean(CT), FO.. = mean(FO..),PP = mean(PP),
+              PP.. = mean(PP..),Assists = mean(Assists),Saves = mean(Saves),
+              GA = mean(GA),X2GA = mean(X2GA),SvPct = mean(SvPct)
+              )
+
+
+Week5test=read.csv("Week5test.csv")
+Week4Summaries=matchup[(1:12),]
+
+
+```
+```{r}
+#train test week 5 NN model
+NNModelweek5pred= train(Win~.,
+                Week4Summaries[,(4:40)],
+                method = "dnn",
+                tuneGrid = tunegrid,
+                trControl= trCtrl,
+                preProcess=c("scale","center"))
+
+pred=predict(NNModelweek5pred,Week5test[,(2:40)])
+pred
+actual=matchup$Win[(13:15)]
+actual
+```
+
+
+
+```{r}
+#Train test week 5 RF model
+random_forest_modelweek5pred = train(Win ~ ., 
+                            data = Week4Summaries[,(4:40)], 
+                            method = "rf",
+                            trControl = trctrl,
+                            ntree = 50,
+                            importance = TRUE)
+
+pred=predict(random_forest_modelweek5pred,Week5test[,(2:40)])
+pred
+actual=matchup$Win[(13:15)]
+actual
+```
+```{r}
+#append results
+new=c("TEAM2","TEAM1","TEAM2")
+rfpred=c(rfpred, new)
+```
+
+
+WEEK 6
+```{r}
+#week 6 summaries
+test= game[(1:30),]
+
+test = test[,c(1,5:23)]%>%
+  group_by(Team) %>%
+    summarise(TeamW = max(TeamW),
+              Points = mean(Points), PA = mean(PA), 
+              X2PtSh = mean(X2PtSh), X2PtShPct = mean(X2PtShPct), 
+              Sh = mean(Sh), Sh.. = mean(Sh..),
+              GB = mean(GB), TO = mean(TO), 
+              CT = mean(CT), FO.. = mean(FO..),PP = mean(PP),
+              PP.. = mean(PP..),Assists = mean(Assists),Saves = mean(Saves),
+              GA = mean(GA),X2GA = mean(X2GA),SvPct = mean(SvPct)
+              )
+
+
+
+Week6test=read.csv("Week6test.csv")
+Week5Summaries=matchup[(1:15),]
+```
+```{r}
+#week6 NN model
+NNModelweek6pred= train(Win~.,
+                Week5Summaries[,(4:40)],
+                method = "dnn",
+                tuneGrid = tunegrid,
+                trControl= trCtrl,
+                preProcess=c("scale","center"))
+
+pred=predict(NNModelweek6pred,Week6test[,(2:40)])
+pred
+actual=matchup$Win[(16:18)]
+actual
+```
+
+```{r}
+#week 6 RF model
+random_forest_modelweekpred = train(Win ~ ., 
+                            data = Week5Summaries[,(4:40)], 
+                            method = "rf",
+                            trControl = trctrl,
+                            ntree = 50,
+                            importance = TRUE)
+
+pred=predict(random_forest_modelweekpred,Week6test[,(2:40)])
+pred
+actual=matchup$Win[(16:18)]
+actual
+```
+```{r}
+#append prediction outcome
+new=c("TEAM2","TEAM2","TEAM2")
+rfpred=c(rfpred,new)
+```
+
+
+WEEK 7
+```{r}
+#week 7 summaries
+test= game[(1:36),]
+
+test = test[,c(1,5:23)]%>%
+  group_by(Team) %>%
+    summarise(TeamW = max(TeamW),
+              Points = mean(Points), PA = mean(PA), 
+              X2PtSh = mean(X2PtSh), X2PtShPct = mean(X2PtShPct), 
+              Sh = mean(Sh), Sh.. = mean(Sh..),
+              GB = mean(GB), TO = mean(TO), 
+              CT = mean(CT), FO.. = mean(FO..),PP = mean(PP),
+              PP.. = mean(PP..),Assists = mean(Assists),Saves = mean(Saves),
+              GA = mean(GA),X2GA = mean(X2GA),SvPct = mean(SvPct)
+              )
+
+
+
+Week7test=read.csv("Week7test.csv")
+Week6Summaries=matchup[(1:18),]
+
+```
+
+```{r}
+#week 7 RF model, I stopped NN model because it always said team 1 or team 2 would win every game that week 
+random_forest_modelweekpred = train(Win ~ ., 
+                            data = Week6Summaries[,(4:40)], 
+                            method = "rf",
+                            trControl = trctrl,
+                            ntree = 50,
+                            importance = TRUE)
+
+pred=predict(random_forest_modelweekpred,Week7test[,(2:40)])
+pred
+actual=matchup$Win[(19:21)]
+actual
+```
+```{r}
+#append output
+new=c("TEAM2","TEAM1","TEAM1")
+rfpred=c(rfpred,new)
+```
+
+
+WEEK 8
+```{r}
+#week 8 summary
+test= game[(1:42),]
+
+test = test[,c(1,5:23)]%>%
+  group_by(Team) %>%
+    summarise(TeamW = max(TeamW),
+              Points = mean(Points), PA = mean(PA), 
+              X2PtSh = mean(X2PtSh), X2PtShPct = mean(X2PtShPct), 
+              Sh = mean(Sh), Sh.. = mean(Sh..),
+              GB = mean(GB), TO = mean(TO), 
+              CT = mean(CT), FO.. = mean(FO..),PP = mean(PP),
+              PP.. = mean(PP..),Assists = mean(Assists),Saves = mean(Saves),
+              GA = mean(GA),X2GA = mean(X2GA),SvPct = mean(SvPct)
+              )
+
+
+
+Week8test=read.csv("Week8test.csv")
+Week7Summaries=matchup[(1:21),]
+
+```
+
+```{r}
+#week 8 RF model
+random_forest_modelweekpred = train(Win ~ ., 
+                            data = Week7Summaries[,(4:40)], 
+                            method = "rf",
+                            trControl = trctrl,
+                            ntree = 50,
+                            importance = TRUE)
+
+pred=predict(random_forest_modelweekpred,Week8test[,(2:40)])
+pred
+actual=matchup$Win[(22:24)]
+actual
+```
+```{r}
+#append output
+new=c("TEAM1","TEAM2","TEAM1")
+rfpred=c(rfpred,new)
+```
+
+
+WEEK 9
+```{r}
+#week9 summary
+Week8Summaries= game[(1:48),]
+
+Week9test = Week8Summaries[,c(1,5:23)]%>%
+  group_by(Team) %>%
+    summarise(TeamW = max(TeamW),
+              Points = mean(Points), PA = mean(PA), 
+              X2PtSh = mean(X2PtSh), X2PtShPct = mean(X2PtShPct), 
+              Sh = mean(Sh), Sh.. = mean(Sh..),
+              GB = mean(GB), TO = mean(TO), 
+              CT = mean(CT), FO.. = mean(FO..),PP = mean(PP),
+              PP.. = mean(PP..),Assists = mean(Assists),Saves = mean(Saves),
+              GA = mean(GA),X2GA = mean(X2GA),SvPct = mean(SvPct)
+              )
+
+
+
+Week9test=read.csv("Week9test.csv")
+Week8Summaries=matchup[(1:24),]
+
+```
+
+```{r}
+#week 9 rf model
+random_forest_modelweekpred = train(Win ~ ., 
+                            data = Week8Summaries[,(4:40)], 
+                            method = "rf",
+                            trControl = trctrl,
+                            ntree = 50,
+                            importance = TRUE)
+
+pred=predict(random_forest_modelweekpred,Week9test[,(2:40)])
+pred
+actual=matchup$Win[(25:27)]
+actual
+#random_forest_modelweekpred$results
+```
+```{r}
+#append output
+new=c("TEAM1","TEAM2","TEAM2")
+rfpred=c(rfpred,new)
+```
+
+
+WEEK 10
+```{r}
+#week 10 summary
+
+test= game[(1:54),]
+
+
+
+test = test[,c(1,5:23)]%>%
+  group_by(Team) %>%
+    summarise(TeamW = max(TeamW),
+              Points = mean(Points), PA = mean(PA), 
+              X2PtSh = mean(X2PtSh), X2PtShPct = mean(X2PtShPct), 
+              Sh = mean(Sh), Sh.. = mean(Sh..),
+              GB = mean(GB), TO = mean(TO), 
+              CT = mean(CT), FO.. = mean(FO..),PP = mean(PP),
+              PP.. = mean(PP..),Assists = mean(Assists),Saves = mean(Saves),
+              GA = mean(GA),X2GA = mean(X2GA),SvPct = mean(SvPct)
+              )
+
+
+Week10test=read.csv("Week10test.csv")
+Week9Summaries=matchup[(1:27),]
+
+
+```
+
+```{r}
+#week 10 rf model
+
+random_forest_modelweekpred = train(Win ~ ., 
+                            data = Week9Summaries[,(4:40)], 
+                            method = "rf",
+                            trControl = trctrl,
+                            ntree = 50,
+                            importance = TRUE)
+
+pred=predict(random_forest_modelweekpred,Week10test[,(2:40)])
+pred
+actual=matchup$Win[(28:30)]
+actual
+#random_forest_modelweekpred$results
+```
+```{r}
+#append final output
+new=c("TEAM1","TEAM1","TEAM2")
+rfpred=c(rfpred,new)
+```
+
+
+```{r}
+#create importance plot
+Importance = varImp(random_forest_modelweekpred) 
+plot(Importance)
+```
+
+
+```{r}
+#create confusion matrix
+results=read.csv("results.csv")
+
+
+confusionMatrix(results$Win,results$RF)
+```
+
+
+
+
+
+
