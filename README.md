@@ -1,6 +1,6 @@
 # DA401
 
-HSU,C-FINAL.pdf: Final project report explaining analysis and findings
+HSU,C-FINAL.pdf: Final project report explaining analysis and findings from the Premier Lacrosse League 2019 season
 
 HSU_FINAL.RMD: Contains code used in cleaning data and running prediction analysis
 
